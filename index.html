@@ -1,0 +1,570 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dasbor Interaktif: Konsep Dasar Geografi (dengan Gemini AI)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <!-- Chosen Palette: Calm Harmony Neutrals -->
+    <!-- Application Structure Plan: Aplikasi ini disusun menjadi tiga bagian tematik yang dapat dinavigasi melalui bilah atas: 'Dasar Peta', 'Penginderaan Jauh', dan 'SIG & Perencanaan'. Struktur ini mengelompokkan konsep-konsep terkait untuk alur pengguna yang lebih logis daripada dokumen linier asli. Sebagai contoh, ini menggabungkan hubungan abstrak PJ-SIG dengan manfaat konkretnya dalam satu bagian. Pendekatan tematik non-linier ini memungkinkan pengguna untuk langsung melompat ke topik yang diminati, dan elemen interaktif seperti diagram yang dapat diklik dan kartu balik digunakan untuk membuat informasi padat lebih mudah dicerna dan menarik. Fitur Gemini API ditambahkan untuk menghasilkan konten dinamis (ide peta dan studi kasus) untuk memperdalam pemahaman praktis. -->
+    <!-- Visualization & Content Choices: 
+    - Tipe Peta: Tujuan Membandingkan -> Metode: Tata letak dua kolom HTML -> Interaksi: Klik/Arahkan kursor -> Justifikasi: Menyoroti perbedaan dengan jelas. (HTML/JS)
+    - Komponen Peta: Tujuan Mengorganisir/Menginformasikan -> Metode: Diagram interaktif dengan area yang dapat diklik -> Justifikasi: Melibatkan pengguna lebih dari sekadar daftar statis. (HTML/CSS/JS)
+    - Sistem Inderaja: Tujuan Membandingkan -> Metode: Tata letak kartu dua kolom -> Justifikasi: Diferensiasi visual yang jelas. (HTML/CSS)
+    - Alur Kerja PJ-SIG: Tujuan Perubahan/Proses -> Metode: Diagram alur horizontal -> Justifikasi: Memvisualisasikan alur proses secara efektif. (HTML/CSS/Flexbox)
+    - Manfaat SIG: Tujuan Menginformasikan -> Metode: Kisi kartu balik interaktif -> Justifikasi: Memecah daftar panjang menjadi bagian-bagian yang mudah dikelola dan menarik. (HTML/CSS/JS)
+    - Fitur Gemini 1 (Ide Peta): Tujuan Menciptakan/Menginformasikan -> Metode: Input + Tombol -> Interaksi: Pengguna memasukkan tema -> Justifikasi: Memberikan contoh praktis dan kreatif di luar daftar statis. (JS/Gemini API)
+    - Fitur Gemini 2 (Studi Kasus): Tujuan Menginformasikan/Mensintesis -> Metode: Tombol pada kartu + Modal -> Interaksi: Pengguna memilih manfaat & memasukkan lokasi -> Justifikasi: Menghubungkan konsep abstrak SIG dengan aplikasi dunia nyata yang relevan secara lokasi. (JS/Gemini API)
+    - KONFIRMASI: Semua visual dibangun dengan HTML/CSS. Tidak ada bagan yang diperlukan karena tidak ada data kuantitatif. -->
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #FDFDF6;
+            color: #383838;
+        }
+        .nav-active {
+            background-color: #A6B8A9;
+            color: #FDFDF6;
+            font-weight: 600;
+        }
+        .nav-item {
+            transition: all 0.3s ease;
+        }
+        .content-section {
+            display: none;
+        }
+        .active-section {
+            display: block;
+        }
+        .flip-card {
+            perspective: 1000px;
+        }
+        .flip-card-inner {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            text-align: center;
+            transition: transform 0.6s;
+            transform-style: preserve-3d;
+        }
+        .flip-card.flipped .flip-card-inner {
+            transform: rotateY(180deg);
+        }
+        .flip-card-front, .flip-card-back {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            -webkit-backface-visibility: hidden;
+            backface-visibility: hidden;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            border-radius: 0.75rem;
+        }
+        .flip-card-front {
+             background-color: #E8EAE3;
+        }
+        .flip-card-back {
+            background-color: #D3D9CF;
+            transform: rotateY(180deg);
+            padding: 1rem;
+        }
+        .map-component-hotspot {
+            transition: all 0.2s ease-in-out;
+            cursor: pointer;
+        }
+        .map-component-hotspot:hover, .map-component-hotspot.active {
+            transform: scale(1.1);
+            background-color: #A6B8A9;
+            color: white;
+            z-index: 10;
+        }
+        /* Styles for Modal and Loader */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.3s ease, visibility 0.3s ease;
+        }
+        .modal-overlay.visible {
+            opacity: 1;
+            visibility: visible;
+        }
+        .modal-content {
+            background: white;
+            padding: 2rem;
+            border-radius: 0.5rem;
+            max-width: 500px;
+            width: 90%;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+            transform: translateY(-50px);
+            transition: transform 0.3s ease;
+        }
+        .modal-overlay.visible .modal-content {
+            transform: translateY(0);
+        }
+        .loader {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #A6B8A9;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+            margin: 1rem auto;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .gemini-button {
+            background-color: #899a8c;
+            color: white;
+            transition: background-color 0.3s;
+        }
+        .gemini-button:hover {
+            background-color: #728375;
+        }
+    </style>
+</head>
+<body class="antialiased">
+
+    <div class="container mx-auto px-4 py-8">
+        <header class="text-center mb-10">
+            <h1 class="text-4xl md:text-5xl font-bold text-gray-800">Konsep Dasar Geografi</h1>
+            <p class="mt-2 text-lg text-gray-600">Sebuah Penjelajahan Interaktif tentang Peta, Penginderaan Jauh, dan SIG</p>
+        </header>
+
+        <nav class="flex justify-center mb-12 bg-gray-100 rounded-full p-2 shadow-inner">
+            <button data-target="peta" class="nav-item nav-active w-1/3 text-center py-2 px-4 rounded-full">Dasar Peta</button>
+            <button data-target="inderaja" class="nav-item w-1/3 text-center py-2 px-4 rounded-full">Penginderaan Jauh</button>
+            <button data-target="sig" class="nav-item w-1/3 text-center py-2 px-4 rounded-full">SIG & Perencanaan</button>
+        </nav>
+
+        <main id="main-content">
+            <!-- Section 1: Dasar Peta -->
+            <section id="peta" class="content-section active-section">
+                <div class="text-center mb-12">
+                     <h2 class="text-3xl font-bold mb-2">Memahami Dunia Melalui Peta</h2>
+                     <p class="max-w-3xl mx-auto text-gray-600">Peta adalah representasi visual dari sebuah area, namun tidak semua peta diciptakan sama. Bagian ini menjelaskan perbedaan jenis peta, komponen penting yang harus ada, dan syarat agar sebuah peta dapat dikatakan baik dan akurat.</p>
+                </div>
+
+                <div class="grid md:grid-cols-2 gap-8 mb-12">
+                    <div class="bg-white p-6 rounded-lg shadow-md">
+                        <h3 class="text-2xl font-bold mb-3 text-center">Peta Administratif</h3>
+                        <p class="text-gray-700 mb-4">Menampilkan batas-batas wilayah yang ditetapkan secara politis atau yurisdiksi. Tujuannya adalah untuk orientasi lokasi dan pengelolaan pemerintahan.</p>
+                        <div class="bg-gray-50 p-3 rounded">
+                            <h4 class="font-semibold">Contoh:</h4>
+                            <ul class="list-disc list-inside text-gray-600">
+                                <li>Peta Provinsi di Indonesia</li>
+                                <li>Peta Batas Negara di Eropa</li>
+                            </ul>
+                        </div>
+                    </div>
+                    <div class="bg-white p-6 rounded-lg shadow-md">
+                        <h3 class="text-2xl font-bold mb-3 text-center">Peta Tematik</h3>
+                        <p class="text-gray-700 mb-4">Dirancang untuk menonjolkan satu tema atau topik tertentu pada suatu wilayah geografis untuk analisis pola, sebaran, dan hubungan fenomena.</p>
+                        <div class="bg-gray-50 p-3 rounded">
+                            <h4 class="font-semibold">Contoh:</h4>
+                             <ul class="list-disc list-inside text-gray-600">
+                                <li>Peta Curah Hujan</li>
+                                <li>Peta Kepadatan Penduduk</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Gemini Feature 1: Thematic Map Idea Generator -->
+                <div class="bg-white p-8 rounded-lg shadow-xl mb-12">
+                    <h3 class="text-2xl font-bold mb-4 text-center">✨ Generator Ide Peta Tematik</h3>
+                    <p class="text-center text-gray-600 mb-6">Punya ide untuk sebuah tema? Masukkan di bawah ini dan biarkan AI membantu Anda membuat konsepnya!</p>
+                    <div class="flex flex-col sm:flex-row gap-2 max-w-xl mx-auto">
+                        <input type="text" id="thematic-map-input" placeholder="Contoh: Perkebunan Kopi di Bali" class="flex-grow p-2 border rounded-md focus:ring-2 focus:ring-A6B8A9 focus:outline-none">
+                        <button id="generate-map-idea-btn" class="gemini-button font-semibold py-2 px-4 rounded-md">Buat Ide Peta</button>
+                    </div>
+                    <div id="thematic-map-result" class="mt-6 max-w-xl mx-auto p-4 bg-gray-50 rounded-lg" style="display: none;"></div>
+                </div>
+
+
+                <div class="bg-white p-8 rounded-lg shadow-xl mb-12">
+                    <h3 class="text-2xl font-bold mb-6 text-center">Anatomi Peta: Apa Saja Komponennya?</h3>
+                    <p class="text-center text-gray-600 mb-6">Klik pada setiap komponen di diagram di bawah ini untuk melihat penjelasannya.</p>
+                    <div class="flex flex-col md:flex-row gap-6 items-center">
+                        <div class="w-full md:w-2/3 h-96 bg-gray-100 rounded-lg border-4 border-gray-700 p-4 relative flex flex-col shadow-inner">
+                            <div id="map-title" class="map-component-hotspot absolute top-2 left-1/2 -translate-x-1/2 bg-white px-3 py-1 rounded-md border border-gray-400 shadow">Judul Peta</div>
+                            <div id="map-content-area" class="flex-grow bg-blue-100 border border-dashed border-blue-400 rounded flex items-center justify-center text-blue-500 font-semibold">Area Peta</div>
+                             <div class="absolute top-1/2 left-4 -translate-y-1/2 flex flex-col items-center">
+                                <div id="map-orientation" class="map-component-hotspot w-12 h-12 bg-white rounded-full flex items-center justify-center shadow border border-gray-400 font-bold text-xl">U</div>
+                            </div>
+                            <div id="map-legend" class="map-component-hotspot absolute bottom-2 right-2 bg-white p-2 rounded-md border border-gray-400 shadow">
+                                <p class="font-bold text-sm">Legenda</p>
+                                <div class="flex items-center mt-1"><div class="w-3 h-3 bg-green-400 mr-2"></div><span class="text-xs">Area Hutan</span></div>
+                            </div>
+                           <div id="map-scale" class="map-component-hotspot absolute bottom-2 left-2 bg-white px-3 py-1 rounded-md border border-gray-400 shadow">Skala 1:1000</div>
+                           <div id="map-inset" class="map-component-hotspot absolute top-2 right-2 w-20 h-16 bg-white p-1 rounded-md border-2 border-gray-500 shadow">
+                               <div class="w-full h-full bg-red-200 border border-dashed border-red-400"></div>
+                           </div>
+                        </div>
+                        <div id="map-component-info" class="w-full md:w-1/3 p-4 bg-yellow-50 rounded-lg h-96 overflow-y-auto">
+                            <h4 class="font-bold text-lg mb-2">Penjelasan Komponen</h4>
+                            <p class="text-gray-700">Pilih salah satu komponen pada diagram untuk melihat detailnya di sini.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div>
+                    <h3 class="text-2xl font-bold mb-6 text-center">3 Syarat Peta yang Baik</h3>
+                    <div class="grid md:grid-cols-3 gap-6">
+                        <div class="bg-white p-6 rounded-lg text-center shadow-lg transform hover:scale-105 transition-transform duration-300">
+                            <div class="text-4xl mb-3">📐</div>
+                            <h4 class="text-xl font-bold mb-2">Conform</h4>
+                            <p class="text-gray-600">Bentuk area pada peta harus sebangun atau mirip dengan bentuk aslinya di lapangan.</p>
+                        </div>
+                        <div class="bg-white p-6 rounded-lg text-center shadow-lg transform hover:scale-105 transition-transform duration-300">
+                             <div class="text-4xl mb-3">📏</div>
+                            <h4 class="text-xl font-bold mb-2">Equidistant</h4>
+                            <p class="text-gray-600">Jarak di peta, setelah dikalikan skala, harus sama dengan jarak sebenarnya.</p>
+                        </div>
+                        <div class="bg-white p-6 rounded-lg text-center shadow-lg transform hover:scale-105 transition-transform duration-300">
+                             <div class="text-4xl mb-3">🌐</div>
+                            <h4 class="text-xl font-bold mb-2">Equivalent</h4>
+                            <p class="text-gray-600">Luas area di peta, setelah dikalikan skala, harus sama dengan luas sebenarnya.</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Section 2: Penginderaan Jauh -->
+            <section id="inderaja" class="content-section">
+                <div class="text-center mb-12">
+                     <h2 class="text-3xl font-bold mb-2">Melihat Bumi dari Jauh</h2>
+                     <p class="max-w-3xl mx-auto text-gray-600">Penginderaan Jauh (Inderaja) adalah seni dan ilmu memperoleh informasi tentang objek tanpa kontak langsung. Teknologi ini terbagi menjadi dua sistem utama berdasarkan sumber energinya: pasif dan aktif.</p>
+                </div>
+                 <div class="grid md:grid-cols-2 gap-8">
+                    <div class="bg-white p-6 rounded-lg shadow-xl border-t-4 border-blue-400">
+                        <h3 class="text-2xl font-bold mb-3 text-center">Sistem Pasif</h3>
+                        <p class="text-center text-5xl mb-4">☀️</p>
+                        <p class="text-gray-700 mb-4">Sensor hanya merekam energi alami (biasanya dari Matahari) yang dipantulkan atau dipancarkan oleh objek di permukaan bumi.</p>
+                        <div class="space-y-3">
+                            <div><strong class="text-green-600">Kelebihan:</strong> Umumnya lebih murah.</div>
+                            <div><strong class="text-red-600">Kelemahan:</strong> Bergantung pada cuaca dan waktu (tidak bisa menembus awan atau beroperasi di malam hari).</div>
+                            <div><strong class="text-gray-800">Contoh:</strong> Citra Satelit Landsat & SPOT, Foto Udara.</div>
+                        </div>
+                    </div>
+                    <div class="bg-white p-6 rounded-lg shadow-xl border-t-4 border-purple-500">
+                        <h3 class="text-2xl font-bold mb-3 text-center">Sistem Aktif</h3>
+                         <p class="text-center text-5xl mb-4">🛰️)))</p>
+                        <p class="text-gray-700 mb-4">Sensor secara aktif memancarkan energinya sendiri ke objek, lalu merekam energi yang dipantulkan kembali.</p>
+                         <div class="space-y-3">
+                            <div><strong class="text-green-600">Kelebihan:</strong> Dapat beroperasi siang & malam, mampu menembus awan, kabut, dan debu.</div>
+                            <div><strong class="text-red-600">Kelemahan:</strong> Teknologi lebih kompleks dan mahal.</div>
+                            <div><strong class="text-gray-800">Contoh:</strong> RADAR dan LiDAR.</div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Section 3: SIG & Perencanaan -->
+            <section id="sig" class="content-section">
+                <div class="text-center mb-12">
+                     <h2 class="text-3xl font-bold mb-2">SIG: Kekuatan Data Spasial</h2>
+                     <p class="max-w-3xl mx-auto text-gray-600">Sistem Informasi Geografis (SIG) adalah alat untuk mengelola dan menganalisis data geospasial. Bagian ini menjelaskan bagaimana SIG bekerja sama dengan data Penginderaan Jauh dan manfaatnya yang luar biasa bagi perencanaan pembangunan.</p>
+                </div>
+                
+                <div class="bg-white p-8 rounded-lg shadow-xl mb-12">
+                    <h3 class="text-2xl font-bold mb-6 text-center">Keterkaitan Penginderaan Jauh dan SIG</h3>
+                    <p class="text-center text-gray-600 mb-8">Inderaja menyediakan data mentah, dan SIG adalah 'otak' yang mengolahnya menjadi informasi yang berguna. Inilah alur kerjanya:</p>
+                    <div class="flex flex-col md:flex-row justify-between items-center space-y-4 md:space-y-0 md:space-x-4">
+                        <div class="text-center w-full md:w-1/4 p-4 bg-gray-50 rounded-lg">
+                            <div class="text-3xl">📷</div>
+                            <h4 class="font-bold">1. Akuisisi Data</h4>
+                            <p class="text-sm text-gray-600">Inderaja merekam citra permukaan bumi.</p>
+                        </div>
+                        <div class="text-2xl text-gray-400 font-bold transform rotate-90 md:rotate-0">&rarr;</div>
+                         <div class="text-center w-full md:w-1/4 p-4 bg-gray-50 rounded-lg">
+                            <div class="text-3xl">📥</div>
+                            <h4 class="font-bold">2. Input ke SIG</h4>
+                            <p class="text-sm text-gray-600">Citra dimasukkan sebagai lapisan data di SIG.</p>
+                        </div>
+                        <div class="text-2xl text-gray-400 font-bold transform rotate-90 md:rotate-0">&rarr;</div>
+                         <div class="text-center w-full md:w-1/4 p-4 bg-gray-50 rounded-lg">
+                            <div class="text-3xl">⚙️</div>
+                            <h4 class="font-bold">3. Analisis</h4>
+                            <p class="text-sm text-gray-600">Data diolah dan digabung dengan data lain.</p>
+                        </div>
+                        <div class="text-2xl text-gray-400 font-bold transform rotate-90 md:rotate-0">&rarr;</div>
+                         <div class="text-center w-full md:w-1/4 p-4 bg-gray-50 rounded-lg">
+                            <div class="text-3xl">🗺️</div>
+                            <h4 class="font-bold">4. Output</h4>
+                            <p class="text-sm text-gray-600">Hasilnya menjadi peta, tabel, atau grafik.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div>
+                    <h3 class="text-2xl font-bold mb-6 text-center">Manfaat SIG untuk Pembangunan Wilayah</h3>
+                    <p class="text-center text-gray-600 mb-8">Klik setiap kartu untuk mengungkap detailnya, lalu buat studi kasus hipotetis dengan bantuan AI.</p>
+                    <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                        <!-- Card 1 -->
+                        <div class="flip-card h-56 cursor-pointer" >
+                            <div class="flip-card-inner rounded-xl shadow-lg">
+                                <div class="flip-card-front"><span class="text-4xl">📍</span><h4 class="text-xl font-bold mt-2">Penentuan Lokasi</h4></div>
+                                <div class="flip-card-back">
+                                    <p class="text-sm mb-3">Menemukan lokasi terbaik untuk fasilitas baru (sekolah, rumah sakit) dengan menganalisis aksesibilitas, populasi, dan kondisi lahan.</p>
+                                    <button class="gemini-button case-study-btn font-semibold py-2 px-4 rounded-md" data-benefit-title="Penentuan Lokasi Optimal">✨ Buat Studi Kasus</button>
+                                </div>
+                            </div>
+                        </div>
+                         <!-- Card 2 -->
+                        <div class="flip-card h-56 cursor-pointer" >
+                            <div class="flip-card-inner rounded-xl shadow-lg">
+                                <div class="flip-card-front"><span class="text-4xl">🌳</span><h4 class="text-xl font-bold mt-2">Manajemen SDA</h4></div>
+                                <div class="flip-card-back">
+                                    <p class="text-sm mb-3">Membantu memantau deforestasi, mengelola daerah aliran sungai, dan mengidentifikasi lahan pertanian potensial.</p>
+                                    <button class="gemini-button case-study-btn font-semibold py-2 px-4 rounded-md" data-benefit-title="Manajemen Sumber Daya Alam">✨ Buat Studi Kasus</button>
+                                </div>
+                            </div>
+                        </div>
+                         <!-- Card 3 -->
+                        <div class="flip-card h-56 cursor-pointer" >
+                            <div class="flip-card-inner rounded-xl shadow-lg">
+                                <div class="flip-card-front"><span class="text-4xl">🏗️</span><h4 class="text-xl font-bold mt-2">Perencanaan Tata Ruang</h4></div>
+                                <div class="flip-card-back">
+                                    <p class="text-sm mb-3">Merancang zona peruntukan lahan (industri, pemukiman) agar pembangunan lebih terarah dan tidak tumpang tindih.</p>
+                                    <button class="gemini-button case-study-btn font-semibold py-2 px-4 rounded-md" data-benefit-title="Perencanaan Tata Ruang">✨ Buat Studi Kasus</button>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- Card 4 -->
+                        <div class="flip-card h-56 cursor-pointer" >
+                            <div class="flip-card-inner rounded-xl shadow-lg">
+                                <div class="flip-card-front"><span class="text-4xl">🌊</span><h4 class="text-xl font-bold mt-2">Manajemen Bencana</h4></div>
+                                <div class="flip-card-back">
+                                    <p class="text-sm mb-3">Memetakan area rawan bencana untuk merencanakan jalur evakuasi, lokasi posko bantuan, dan strategi mitigasi.</p>
+                                    <button class="gemini-button case-study-btn font-semibold py-2 px-4 rounded-md" data-benefit-title="Manajemen Bencana">✨ Buat Studi Kasus</button>
+                                </div>
+                            </div>
+                        </div>
+                         <!-- Card 5 -->
+                        <div class="flip-card h-56 cursor-pointer" >
+                            <div class="flip-card-inner rounded-xl shadow-lg">
+                                <div class="flip-card-front"><span class="text-4xl">🌍</span><h4 class="text-xl font-bold mt-2">Analisis Dampak Lingkungan</h4></div>
+                                <div class="flip-card-back">
+                                    <p class="text-sm mb-3">Memodelkan dan memvisualisasikan dampak proyek pembangunan terhadap lingkungan sekitar.</p>
+                                    <button class="gemini-button case-study-btn font-semibold py-2 px-4 rounded-md" data-benefit-title="Analisis Dampak Lingkungan">✨ Buat Studi Kasus</button>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- Card 6 -->
+                        <div class="flip-card h-56 cursor-pointer" >
+                            <div class="flip-card-inner rounded-xl shadow-lg">
+                                <div class="flip-card-front"><span class="text-4xl">💡</span><h4 class="text-xl font-bold mt-2">Bantuan Pengambilan Keputusan</h4></div>
+                                <div class="flip-card-back">
+                                    <p class="text-sm mb-3">Menyajikan data kompleks dalam bentuk peta visual yang mudah dipahami untuk keputusan yang lebih akurat.</p>
+                                    <button class="gemini-button case-study-btn font-semibold py-2 px-4 rounded-md" data-benefit-title="Dukungan Pengambilan Keputusan">✨ Buat Studi Kasus</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Modal for Case Study Generator -->
+    <div id="case-study-modal" class="modal-overlay">
+        <div class="modal-content">
+            <h3 id="modal-title" class="text-2xl font-bold mb-4">Buat Studi Kasus</h3>
+            <p class="text-gray-600 mb-4">Masukkan nama lokasi (contoh: Kota Denpasar) untuk membuat studi kasus hipotetis.</p>
+            <input type="text" id="case-study-location-input" placeholder="Masukkan lokasi..." class="w-full p-2 border rounded-md focus:ring-2 focus:ring-A6B8A9 focus:outline-none mb-4">
+            <div class="flex justify-end gap-2">
+                <button id="close-modal-btn" class="font-semibold py-2 px-4 rounded-md border">Tutup</button>
+                <button id="generate-case-study-btn" class="gemini-button font-semibold py-2 px-4 rounded-md">✨ Hasilkan</button>
+            </div>
+            <div id="case-study-result" class="mt-6 p-4 bg-gray-50 rounded-lg" style="display: none;"></div>
+        </div>
+    </div>
+
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            // Navigation
+            const navButtons = document.querySelectorAll('.nav-item');
+            const contentSections = document.querySelectorAll('.content-section');
+            navButtons.forEach(button => {
+                button.addEventListener('click', () => {
+                    const targetId = button.dataset.target;
+                    navButtons.forEach(btn => btn.classList.remove('nav-active'));
+                    button.classList.add('nav-active');
+                    contentSections.forEach(section => {
+                        section.classList.toggle('active-section', section.id === targetId);
+                    });
+                });
+            });
+
+            // Flip Cards
+            const flipCards = document.querySelectorAll('.flip-card');
+            flipCards.forEach(card => {
+                card.addEventListener('click', (e) => {
+                    if (e.target.classList.contains('case-study-btn')) return;
+                    card.classList.toggle('flipped');
+                });
+            });
+
+            // Map Component Interaction
+            const mapComponentData = {
+                'map-title': { title: 'Judul Peta', text: 'Menggambarkan isi dan lokasi wilayah yang dipetakan. Ini adalah hal pertama yang dilihat pembaca untuk memahami tentang apa peta tersebut.' },
+                'map-orientation': { title: 'Orientasi', text: 'Petunjuk arah, biasanya berupa panah yang menunjuk ke arah utara, untuk membantu pembaca memahami orientasi peta terhadap mata angin.' },
+                'map-legend': { title: 'Legenda', text: 'Daftar simbol-simbol yang digunakan pada peta beserta penjelasannya. Ini adalah kunci untuk membaca dan memahami isi peta.' },
+                'map-scale': { title: 'Skala Peta', text: 'Menunjukkan perbandingan jarak pada peta dengan jarak sebenarnya di lapangan. Dapat berupa skala angka (1:50.000) atau skala grafis (garis).' },
+                'map-inset': { title: 'Inset Peta', text: 'Peta kecil tambahan untuk menunjukkan lokasi daerah yang dipetakan dalam konteks wilayah yang lebih luas, atau untuk memperbesar area penting.' },
+                'map-content-area': { title: 'Area Peta', text: 'Bagian utama dari peta yang berisi representasi geografis dari suatu wilayah beserta simbol-simbol yang relevan.'}
+            };
+            const hotspots = document.querySelectorAll('.map-component-hotspot');
+            const infoBox = document.getElementById('map-component-info');
+            hotspots.forEach(hotspot => {
+                hotspot.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    hotspots.forEach(h => h.classList.remove('active'));
+                    hotspot.classList.add('active');
+                    const data = mapComponentData[hotspot.id];
+                    infoBox.innerHTML = `<h4 class="font-bold text-lg mb-2">${data.title}</h4><p class="text-gray-700">${data.text}</p>`;
+                });
+            });
+            document.querySelector('#peta').addEventListener('click', (e) => {
+                 if (!e.target.closest('.map-component-hotspot')) {
+                    hotspots.forEach(h => h.classList.remove('active'));
+                    infoBox.innerHTML = `<h4 class="font-bold text-lg mb-2">Penjelasan Komponen</h4><p class="text-gray-700">Pilih salah satu komponen pada diagram untuk melihat detailnya di sini.</p>`;
+                 }
+            });
+
+            // --- Gemini API Features ---
+
+            const apiKey = ""; // API key will be provided by the environment
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+            
+            // Feature 1: Thematic Map Idea Generator
+            const generateMapIdeaBtn = document.getElementById('generate-map-idea-btn');
+            const thematicMapInput = document.getElementById('thematic-map-input');
+            const thematicMapResult = document.getElementById('thematic-map-result');
+
+            generateMapIdeaBtn.addEventListener('click', async () => {
+                const theme = thematicMapInput.value;
+                if (!theme.trim()) {
+                    thematicMapResult.innerHTML = '<p class="text-red-500">Silakan masukkan tema terlebih dahulu.</p>';
+                    thematicMapResult.style.display = 'block';
+                    return;
+                }
+
+                thematicMapResult.style.display = 'block';
+                thematicMapResult.innerHTML = '<div class="loader"></div><p class="text-center">AI sedang berpikir...</p>';
+
+                const prompt = `Anda adalah seorang kartografer ahli. Buatkan konsep singkat untuk sebuah peta tematik dengan tema: "${theme}". Jelaskan tujuan peta tersebut, dan berikan 3-4 contoh lapisan data (layer) yang relevan untuk ditampilkan pada peta tersebut dalam format daftar.`;
+
+                try {
+                    const payload = { contents: [{ parts: [{ text: prompt }] }] };
+                    const response = await fetch(apiUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+
+                    if (!response.ok) {
+                         throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+
+                    const result = await response.json();
+                    if (result.candidates && result.candidates.length > 0) {
+                        const text = result.candidates[0].content.parts[0].text;
+                        thematicMapResult.innerHTML = text.replace(/\n/g, '<br>');
+                    } else {
+                        throw new Error('Respons tidak valid dari API.');
+                    }
+                } catch (error) {
+                    console.error("Error:", error);
+                    thematicMapResult.innerHTML = `<p class="text-red-500">Maaf, terjadi kesalahan saat menghubungi AI. Silakan coba lagi. Error: ${error.message}</p>`;
+                }
+            });
+
+
+            // Feature 2: Case Study Generator
+            const modal = document.getElementById('case-study-modal');
+            const closeModalBtn = document.getElementById('close-modal-btn');
+            const caseStudyBtns = document.querySelectorAll('.case-study-btn');
+            const generateCaseStudyBtn = document.getElementById('generate-case-study-btn');
+            const caseStudyLocationInput = document.getElementById('case-study-location-input');
+            const caseStudyResult = document.getElementById('case-study-result');
+            const modalTitle = document.getElementById('modal-title');
+            
+            let currentBenefitTitle = '';
+
+            caseStudyBtns.forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    currentBenefitTitle = e.target.dataset.benefitTitle;
+                    modalTitle.textContent = `Studi Kasus: ${currentBenefitTitle}`;
+                    caseStudyLocationInput.value = '';
+                    caseStudyResult.style.display = 'none';
+                    caseStudyResult.innerHTML = '';
+                    modal.classList.add('visible');
+                });
+            });
+
+            const closeModal = () => modal.classList.remove('visible');
+            closeModalBtn.addEventListener('click', closeModal);
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) closeModal();
+            });
+
+            generateCaseStudyBtn.addEventListener('click', async () => {
+                const location = caseStudyLocationInput.value;
+                if (!location.trim()) {
+                    caseStudyResult.innerHTML = '<p class="text-red-500">Silakan masukkan lokasi terlebih dahulu.</p>';
+                    caseStudyResult.style.display = 'block';
+                    return;
+                }
+
+                caseStudyResult.style.display = 'block';
+                caseStudyResult.innerHTML = '<div class="loader"></div><p class="text-center">AI sedang menyusun studi kasus...</p>';
+
+                const prompt = `Anda adalah seorang perencana wilayah ahli. Buatkan sebuah studi kasus singkat dan hipotetis (sekitar 150 kata) tentang penerapan Sistem Informasi Geografis (SIG) untuk "${currentBenefitTitle}" di wilayah "${location}". Jelaskan masalah yang ada, bagaimana SIG dapat digunakan untuk analisis, dan apa kemungkinan hasil atau rekomendasi kebijakan yang didapatkan. Gunakan bahasa yang jelas dan profesional.`;
+
+                try {
+                    const payload = { contents: [{ parts: [{ text: prompt }] }] };
+                    const response = await fetch(apiUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+                     if (!response.ok) {
+                         throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    const result = await response.json();
+                     if (result.candidates && result.candidates.length > 0) {
+                        const text = result.candidates[0].content.parts[0].text;
+                        caseStudyResult.innerHTML = text.replace(/\n/g, '<br>');
+                    } else {
+                        throw new Error('Respons tidak valid dari API.');
+                    }
+                } catch (error) {
+                    console.error("Error:", error);
+                    caseStudyResult.innerHTML = `<p class="text-red-500">Maaf, terjadi kesalahan saat menghubungi AI. Silakan coba lagi. Error: ${error.message}</p>`;
+                }
+            });
+        });
+    </script>
+</body>
+</html>
