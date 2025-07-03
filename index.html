@@ -9,7 +9,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
     <!-- Chosen Palette: Calm Harmony Neutrals -->
-    <!-- Application Structure Plan: Aplikasi ini disusun menjadi tiga bagian tematik yang dapat dinavigasi melalui bilah atas: 'Dasar Peta', 'Penginderaan Jauh', dan 'SIG & Perencanaan'. Struktur ini mengelompokkan konsep-konsep terkait untuk alur pengguna yang lebih logis daripada dokumen linier asli. Sebagai contoh, ini menggabungkan hubungan abstrak PJ-SIG dengan manfaat konkretnya dalam satu bagian. Pendekatan tematik non-linier ini memungkinkan pengguna untuk langsung melompat ke topik yang diminati, dan elemen interaktif seperti diagram yang dapat diklik dan kartu balik digunakan untuk membuat informasi padat lebih mudah dicerna dan menarik. Fitur Gemini API ditambahkan untuk menghasilkan konten dinamis (ide peta dan studi kasus) untuk memperdalam pemahaman praktis. -->
+    <!-- Application Structure Plan: Aplikasi ini disusun menjadi tiga bagian tematik yang dapat dinavigasi melalui bilah atas: 'Dasar Peta', 'Penginderaan Jauh', dan 'SIG & Perencanaan'. Struktur ini mengelompokkan konsep-konsep terkait untuk alur pengguna yang lebih logis daripada dokumen linier asli. Sebagai contoh, ini menggabungkan hubungan abstrak PJ-SIG dengan manfaat konkretnya dalam satu bagian. Pendekatan tematik non-linier ini memungkinkan pengguna untuk langsung melompat ke topik yang diminati, dan elemen interaktif seperti diagram yang dapat diklik dan kartu balik digunakan untuk membuat informasi padat lebih mudah dicerna dan menarik. Fitur Gemini API ditambahkan untuk menghasilkan konten dinamis (ide peta dan studi kasus) untuk memperdalam pemahaman praktis. Ditambahkan input API Key untuk memungkinkan pengujian online oleh pengguna. -->
     <!-- Visualization & Content Choices: 
     - Tipe Peta: Tujuan Membandingkan -> Metode: Tata letak dua kolom HTML -> Interaksi: Klik/Arahkan kursor -> Justifikasi: Menyoroti perbedaan dengan jelas. (HTML/JS)
     - Komponen Peta: Tujuan Mengorganisir/Menginformasikan -> Metode: Diagram interaktif dengan area yang dapat diklik -> Justifikasi: Melibatkan pengguna lebih dari sekadar daftar statis. (HTML/CSS/JS)
@@ -138,15 +138,31 @@
         .gemini-button:hover {
             background-color: #728375;
         }
+        .gemini-button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
     </style>
 </head>
 <body class="antialiased">
 
     <div class="container mx-auto px-4 py-8">
-        <header class="text-center mb-10">
+        <header class="text-center mb-6">
             <h1 class="text-4xl md:text-5xl font-bold text-gray-800">Konsep Dasar Geografi</h1>
             <p class="mt-2 text-lg text-gray-600">Sebuah Penjelajahan Interaktif tentang Peta, Penginderaan Jauh, dan SIG</p>
         </header>
+
+        <!-- API Key Input Section -->
+        <div id="api-key-section" class="max-w-2xl mx-auto mb-8 p-4 bg-yellow-100 border-l-4 border-yellow-500 rounded-r-lg">
+            <h3 class="font-bold text-yellow-800">Pengaturan Kunci API Gemini</h3>
+            <p class="text-sm text-yellow-700 mb-2">Untuk menggunakan fitur AI, silakan masukkan Google API Key Anda. Kunci Anda disimpan sementara di browser ini saja.</p>
+            <div class="flex gap-2">
+                <input type="password" id="api-key-input" placeholder="Masukkan Google API Key Anda di sini" class="flex-grow p-2 border rounded-md text-sm">
+                <button id="save-api-key-btn" class="bg-yellow-600 hover:bg-yellow-700 text-white font-semibold py-2 px-4 rounded-md text-sm">Simpan</button>
+            </div>
+            <p id="api-key-status" class="text-sm mt-2 font-semibold"></p>
+        </div>
+
 
         <nav class="flex justify-center mb-12 bg-gray-100 rounded-full p-2 shadow-inner">
             <button data-target="peta" class="nav-item nav-active w-1/3 text-center py-2 px-4 rounded-full">Dasar Peta</button>
@@ -401,6 +417,39 @@
 
     <script>
         document.addEventListener('DOMContentLoaded', function () {
+            // --- API Key Management ---
+            const apiKeyInput = document.getElementById('api-key-input');
+            const saveApiKeyBtn = document.getElementById('save-api-key-btn');
+            const apiKeyStatus = document.getElementById('api-key-status');
+            const geminiButtons = document.querySelectorAll('.gemini-button');
+
+            let apiKey = localStorage.getItem('geminiApiKey') || "";
+
+            const updateApiKeyStatus = () => {
+                if (apiKey) {
+                    apiKeyInput.value = apiKey;
+                    apiKeyStatus.textContent = 'API Key aktif. Fitur AI telah diaktifkan.';
+                    apiKeyStatus.className = 'text-sm mt-2 font-semibold text-green-700';
+                    geminiButtons.forEach(btn => btn.disabled = false);
+                } else {
+                    apiKeyStatus.textContent = 'API Key tidak ditemukan. Fitur AI dinonaktifkan.';
+                    apiKeyStatus.className = 'text-sm mt-2 font-semibold text-red-700';
+                    geminiButtons.forEach(btn => btn.disabled = true);
+                }
+            };
+            
+            saveApiKeyBtn.addEventListener('click', () => {
+                apiKey = apiKeyInput.value.trim();
+                if (apiKey) {
+                    localStorage.setItem('geminiApiKey', apiKey);
+                } else {
+                    localStorage.removeItem('geminiApiKey');
+                }
+                updateApiKeyStatus();
+            });
+            
+            updateApiKeyStatus(); // Initial check on page load
+
             // Navigation
             const navButtons = document.querySelectorAll('.nav-item');
             const contentSections = document.querySelectorAll('.content-section');
@@ -451,10 +500,33 @@
                  }
             });
 
-            // --- Gemini API Features ---
-
-            const apiKey = ""; // API key will be provided by the environment
-            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+            // --- Gemini API Call Logic ---
+            async function callGemini(prompt) {
+                if (!apiKey) {
+                    throw new Error("API Key tidak tersedia. Silakan masukkan di pengaturan.");
+                }
+                const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+                const payload = { contents: [{ parts: [{ text: prompt }] }] };
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                if (!response.ok) {
+                    const errorBody = await response.json();
+                    console.error("API Error Body:", errorBody);
+                    throw new Error(`HTTP error! status: ${response.status}. Pesan: ${errorBody.error?.message || 'Unknown error'}`);
+                }
+                const result = await response.json();
+                if (result.candidates && result.candidates.length > 0) {
+                    return result.candidates[0].content.parts[0].text;
+                } else if (result.promptFeedback) {
+                     throw new Error(`Permintaan diblokir. Alasan: ${result.promptFeedback.blockReason}. Detail: ${JSON.stringify(result.promptFeedback.safetyRatings)}`);
+                }
+                else {
+                    throw new Error('Respons tidak valid dari API.');
+                }
+            }
             
             // Feature 1: Thematic Map Idea Generator
             const generateMapIdeaBtn = document.getElementById('generate-map-idea-btn');
@@ -468,34 +540,15 @@
                     thematicMapResult.style.display = 'block';
                     return;
                 }
-
                 thematicMapResult.style.display = 'block';
                 thematicMapResult.innerHTML = '<div class="loader"></div><p class="text-center">AI sedang berpikir...</p>';
-
                 const prompt = `Anda adalah seorang kartografer ahli. Buatkan konsep singkat untuk sebuah peta tematik dengan tema: "${theme}". Jelaskan tujuan peta tersebut, dan berikan 3-4 contoh lapisan data (layer) yang relevan untuk ditampilkan pada peta tersebut dalam format daftar.`;
-
                 try {
-                    const payload = { contents: [{ parts: [{ text: prompt }] }] };
-                    const response = await fetch(apiUrl, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(payload)
-                    });
-
-                    if (!response.ok) {
-                         throw new Error(`HTTP error! status: ${response.status}`);
-                    }
-
-                    const result = await response.json();
-                    if (result.candidates && result.candidates.length > 0) {
-                        const text = result.candidates[0].content.parts[0].text;
-                        thematicMapResult.innerHTML = text.replace(/\n/g, '<br>');
-                    } else {
-                        throw new Error('Respons tidak valid dari API.');
-                    }
+                    const text = await callGemini(prompt);
+                    thematicMapResult.innerHTML = text.replace(/\n/g, '<br>');
                 } catch (error) {
                     console.error("Error:", error);
-                    thematicMapResult.innerHTML = `<p class="text-red-500">Maaf, terjadi kesalahan saat menghubungi AI. Silakan coba lagi. Error: ${error.message}</p>`;
+                    thematicMapResult.innerHTML = `<p class="text-red-500">Maaf, terjadi kesalahan saat menghubungi AI. Silakan coba lagi. <br><small>Detail: ${error.message}</small></p>`;
                 }
             });
 
@@ -536,32 +589,15 @@
                     caseStudyResult.style.display = 'block';
                     return;
                 }
-
                 caseStudyResult.style.display = 'block';
                 caseStudyResult.innerHTML = '<div class="loader"></div><p class="text-center">AI sedang menyusun studi kasus...</p>';
-
                 const prompt = `Anda adalah seorang perencana wilayah ahli. Buatkan sebuah studi kasus singkat dan hipotetis (sekitar 150 kata) tentang penerapan Sistem Informasi Geografis (SIG) untuk "${currentBenefitTitle}" di wilayah "${location}". Jelaskan masalah yang ada, bagaimana SIG dapat digunakan untuk analisis, dan apa kemungkinan hasil atau rekomendasi kebijakan yang didapatkan. Gunakan bahasa yang jelas dan profesional.`;
-
                 try {
-                    const payload = { contents: [{ parts: [{ text: prompt }] }] };
-                    const response = await fetch(apiUrl, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(payload)
-                    });
-                     if (!response.ok) {
-                         throw new Error(`HTTP error! status: ${response.status}`);
-                    }
-                    const result = await response.json();
-                     if (result.candidates && result.candidates.length > 0) {
-                        const text = result.candidates[0].content.parts[0].text;
-                        caseStudyResult.innerHTML = text.replace(/\n/g, '<br>');
-                    } else {
-                        throw new Error('Respons tidak valid dari API.');
-                    }
+                    const text = await callGemini(prompt);
+                    caseStudyResult.innerHTML = text.replace(/\n/g, '<br>');
                 } catch (error) {
                     console.error("Error:", error);
-                    caseStudyResult.innerHTML = `<p class="text-red-500">Maaf, terjadi kesalahan saat menghubungi AI. Silakan coba lagi. Error: ${error.message}</p>`;
+                    caseStudyResult.innerHTML = `<p class="text-red-500">Maaf, terjadi kesalahan saat menghubungi AI. Silakan coba lagi. <br><small>Detail: ${error.message}</small></p>`;
                 }
             });
         });
